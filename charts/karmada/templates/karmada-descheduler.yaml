@@ -50,6 +50,7 @@ spec:
             - --kubeconfig=/etc/kubeconfig
             - --bind-address=0.0.0.0
             - --leader-elect-resource-namespace={{ $systemNamespace }}
+#            - --descheduling-interval=2m
             - --v=4
           livenessProbe:
             httpGet:

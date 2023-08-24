@@ -12,13 +12,14 @@ TARGETS := karmada-aggregated-apiserver \
 			karmada-controller-manager \
 			karmada-scheduler \
 			karmada-descheduler \
-			karmada-webhook \
-			karmada-agent \
-			karmada-scheduler-estimator \
-			karmada-interpreter-webhook-example \
-			karmada-search \
-			karmada-operator \
-			karmada-metrics-adapter
+			karmada-webhook
+
+#			karmada-agent \
+#			karmada-scheduler-estimator \
+#			karmada-interpreter-webhook-example \
+#			karmada-search \
+#			karmada-operator \
+#			karmada-metrics-adapter
 
 CTL_TARGETS := karmadactl kubectl-karmada
 
@@ -122,22 +123,20 @@ test: install_gotest
 	$(GOTEST) --race --v ./cmd/... -coverprofile=./_output/coverage/coverage_cmd.txt -covermode=atomic
 	$(GOTEST) --race --v ./examples/... -coverprofile=./_output/coverage/coverage_examples.txt -covermode=atomic
 
-upload-images: images
+upload-images:
 	@echo "push images to $(REGISTRY)"
-ifneq ($(REGISTRY_USER_NAME), "")
-	docker login -u ${REGISTRY_USER_NAME} -p ${REGISTRY_PASSWORD} ${REGISTRY_SERVER_ADDRESS}
-endif
+
 	docker push ${REGISTRY}/karmada-controller-manager:${VERSION}
 	docker push ${REGISTRY}/karmada-scheduler:${VERSION}
 	docker push ${REGISTRY}/karmada-descheduler:${VERSION}
 	docker push ${REGISTRY}/karmada-webhook:${VERSION}
-	docker push ${REGISTRY}/karmada-agent:${VERSION}
-	docker push ${REGISTRY}/karmada-scheduler-estimator:${VERSION}
-	docker push ${REGISTRY}/karmada-interpreter-webhook-example:${VERSION}
+	#docker push ${REGISTRY}/karmada-agent:${VERSION}
+	#docker push ${REGISTRY}/karmada-scheduler-estimator:${VERSION}
+	#docker push ${REGISTRY}/karmada-interpreter-webhook-example:${VERSION}
 	docker push ${REGISTRY}/karmada-aggregated-apiserver:${VERSION}
-	docker push ${REGISTRY}/karmada-search:${VERSION}
-	docker push ${REGISTRY}/karmada-operator:${VERSION}
-	docker push ${REGISTRY}/karmada-metrics-adapter:${VERSION}
+	#docker push ${REGISTRY}/karmada-search:${VERSION}
+	#docker push ${REGISTRY}/karmada-operator:${VERSION}
+	#docker push ${REGISTRY}/karmada-metrics-adapter:${VERSION}
 
 # Build and package binary
 #

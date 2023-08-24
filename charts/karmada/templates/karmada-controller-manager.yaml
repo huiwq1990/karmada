@@ -54,7 +54,8 @@ spec:
             - --cluster-status-update-frequency=10s
             - --secure-port=10357
             - --leader-elect-resource-namespace={{ $systemNamespace }}
-            - --v=2
+            - --v=4
+            - --skipped-propagating-apis=apiextensions.k8s.io/v1/CustomResourceDefinition;rbac.authorization.k8s.io/v1/ClusterRoleBinding,ClusterRole;apps.kruise.io
             {{- if .Values.controllerManager.controllers }}
             - --controllers={{ .Values.controllerManager.controllers }}
             {{- end }}

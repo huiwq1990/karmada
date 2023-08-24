@@ -84,7 +84,32 @@ func (h *SchedulingResultHelper) GetUndesiredClusters() ([]*TargetClusterWrapper
 	var clusters []*TargetClusterWrapper
 	var names []string
 	for _, cluster := range h.TargetClusters {
-		if cluster.Ready < cluster.Spec {
+		if cluster.Ready != estimatorclient.UnauthenticReplica && cluster.Ready < cluster.Spec {
+			clusters = append(clusters, cluster)
+			names = append(names, cluster.ClusterName)
+		}
+	}
+	return clusters, names
+}
+
+func (h *SchedulingResultHelper) GetUndesiredClustersV2() (map[string]*TargetClusterWrapper, []string) {
+	clusters := make(map[string]*TargetClusterWrapper)
+	var names []string
+
+	for _, cluster := range h.TargetClusters {
+		if cluster.Ready != estimatorclient.UnauthenticReplica && cluster.Ready < cluster.Spec {
+			clusters[cluster.ClusterName] = cluster
+			names = append(names, cluster.ClusterName)
+		}
+	}
+	return clusters, names
+}
+
+func (h *SchedulingResultHelper) GetSatisfyClusters() ([]*TargetClusterWrapper, []string) {
+	var clusters []*TargetClusterWrapper
+	var names []string
+	for _, cluster := range h.TargetClusters {
+		if cluster.Ready >= cluster.Spec {
 			clusters = append(clusters, cluster)
 			names = append(names, cluster.ClusterName)
 		}
@@ -116,6 +141,8 @@ func getReadyReplicas(binding *workv1alpha2.ResourceBinding) map[string]int32 {
 			continue
 		}
 		readyReplicas := int32(0)
+		res[item.ClusterName] = readyReplicas
+
 		// TODO(Garrybest): cooperate with custom resource interpreter
 		if r, ok := workloadStatus[util.ReadyReplicasField]; ok {
 			readyReplicas = int32(r.(float64))

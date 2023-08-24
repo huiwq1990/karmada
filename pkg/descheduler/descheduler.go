@@ -83,9 +83,13 @@ func NewDescheduler(karmadaClient karmadaclientset.Interface, kubeClient kuberne
 		KeyFunc:       nil,
 		ReconcileFunc: desched.reconcileEstimatorConnection,
 	}
+	schedulerEstimatorWorkerOptions.ReconcileFunc = func(key util.QueueKey) error {
+		return nil
+	}
 	desched.schedulerEstimatorWorker = util.NewAsyncWorker(schedulerEstimatorWorkerOptions)
-	schedulerEstimator := estimatorclient.NewSchedulerEstimator(desched.schedulerEstimatorCache, opts.SchedulerEstimatorTimeout.Duration)
-	estimatorclient.RegisterSchedulerEstimator(schedulerEstimator)
+	//schedulerEstimator := estimatorclient.NewSchedulerEstimator(desched.schedulerEstimatorCache, opts.SchedulerEstimatorTimeout.Duration)
+	//estimatorclient.RegisterSchedulerEstimator(schedulerEstimator)
+
 	deschedulerWorkerOptions := util.Options{
 		Name:          "descheduler",
 		KeyFunc:       util.MetaNamespaceKeyFunc,
@@ -118,8 +122,8 @@ func (d *Descheduler) Run(ctx context.Context) {
 	defer klog.Infof("Shutting down karmada descheduler")
 
 	// Establish all connections first and then begin scheduling.
-	d.establishEstimatorConnections()
-	d.schedulerEstimatorWorker.Run(1, stopCh)
+	//d.establishEstimatorConnections()
+	//d.schedulerEstimatorWorker.Run(1, stopCh)
 
 	d.informerFactory.Start(stopCh)
 
@@ -138,7 +142,11 @@ func (d *Descheduler) descheduleOnce() {
 	if err != nil {
 		klog.Errorf("List all ResourceBindings error: %v", err)
 	}
+	klog.InfoS("descheduleOnce", "bindings", len(bindings))
+
 	bindings = core.FilterBindings(bindings)
+	klog.InfoS("descheduleOnce", "filter", len(bindings))
+
 	for _, binding := range bindings {
 		d.deschedulerWorker.Enqueue(binding)
 	}
@@ -150,6 +158,7 @@ func (d *Descheduler) worker(key util.QueueKey) error {
 		return fmt.Errorf("failed to deschedule as invalid key: %v", key)
 	}
 
+	klog.V(4).InfoS("descheduler work", "key", namespacedName)
 	namespace, name, err := cache.SplitMetaNamespaceKey(namespacedName)
 	if err != nil {
 		return fmt.Errorf("invalid resource key: %s", namespacedName)
@@ -165,14 +174,19 @@ func (d *Descheduler) worker(key util.QueueKey) error {
 	}
 
 	h := core.NewSchedulingResultHelper(binding)
+
+	for _, tmp := range h.TargetClusters {
+		klog.InfoS("resourcebinding info", "name", binding.Name, "cluster", tmp.ClusterName, "spec", tmp.Spec, "ready", tmp.Ready)
+	}
+
 	if _, undesiredClusters := h.GetUndesiredClusters(); len(undesiredClusters) == 0 {
+		return nil
+	} else if len(undesiredClusters) == len(binding.Spec.Clusters) {
+		klog.Warningln("Could not descheduler as all clusters not satisfy desire replicas.")
 		return nil
 	}
 
-	h.FillUnschedulableReplicas(d.unschedulableThreshold)
-	klog.V(3).Infof("Unschedulable result of resource(%s): %v", namespacedName, h.TargetClusters)
-
-	return d.updateScheduleResult(h)
+	return d.updateScheduleResultV3(h)
 }
 
 func (d *Descheduler) updateScheduleResult(h *core.SchedulingResultHelper) error {

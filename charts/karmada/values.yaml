@@ -95,6 +95,7 @@ certs:
     expiry: 43800h
     ## @param certs.auto.hosts hosts of the certificate
     hosts: [
+      "10.253.55.196",
       "kubernetes.default.svc",
       "*.etcd.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}",
       "*.{{ .Release.Namespace }}.svc.{{ .Values.clusterDomain }}",

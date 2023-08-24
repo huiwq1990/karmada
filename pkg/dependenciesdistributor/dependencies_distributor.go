@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	"k8s.io/kube-openapi/pkg/util/sets"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -126,6 +128,8 @@ func (d *DependenciesDistributor) OnDelete(obj interface{}) {
 	d.OnAdd(obj)
 }
 
+var skipNss = sets.NewString("kube-pubilc", "kube-system", "karmada-system", "")
+
 // Reconcile performs a full reconciliation for the object referred to by the key.
 // The key will be re-queued if an error is non-nil.
 func (d *DependenciesDistributor) reconcile(key util.QueueKey) error {
@@ -133,6 +137,10 @@ func (d *DependenciesDistributor) reconcile(key util.QueueKey) error {
 	if !ok {
 		klog.Error("Invalid key")
 		return fmt.Errorf("invalid key")
+	}
+	if skipNss.Has(clusterWideKey.Namespace) {
+		klog.V(4).Infof("DependenciesDistributor skip reconcile object: %s", clusterWideKey)
+		return nil
 	}
 	klog.V(4).Infof("DependenciesDistributor start to reconcile object: %s", clusterWideKey)
 	bindingList := &workv1alpha2.ResourceBindingList{}

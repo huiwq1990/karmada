@@ -12,6 +12,11 @@ spec:
         clusterNames:
           - member2
       overriders:
+#        plaintext:
+#          - path: /spec/template/spec/nodeSelector
+#            operator: add
+#            value:
+#                disktype: ssd
         labelsOverrider:
           - operator: add
             value:
