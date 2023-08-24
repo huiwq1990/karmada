@@ -16,7 +16,7 @@ const (
 	defaultBindAddress            = "0.0.0.0"
 	defaultPort                   = 10358
 	defaultEstimatorPort          = 10352
-	defaultDeschedulingInterval   = 2 * time.Minute
+	defaultDeschedulingInterval   = 30 * time.Second
 	defaultUnschedulableThreshold = 5 * time.Minute
 )
 

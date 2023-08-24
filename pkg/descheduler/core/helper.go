@@ -93,7 +93,7 @@ func (h *SchedulingResultHelper) GetUndesiredClusters() ([]*TargetClusterWrapper
 }
 
 func (h *SchedulingResultHelper) GetUndesiredClustersV2() (map[string]*TargetClusterWrapper, []string) {
-	var clusters map[string]*TargetClusterWrapper
+	clusters := make(map[string]*TargetClusterWrapper)
 	var names []string
 
 	for _, cluster := range h.TargetClusters {
@@ -141,6 +141,8 @@ func getReadyReplicas(binding *workv1alpha2.ResourceBinding) map[string]int32 {
 			continue
 		}
 		readyReplicas := int32(0)
+		res[item.ClusterName] = readyReplicas
+
 		// TODO(Garrybest): cooperate with custom resource interpreter
 		if r, ok := workloadStatus[util.ReadyReplicasField]; ok {
 			readyReplicas = int32(r.(float64))

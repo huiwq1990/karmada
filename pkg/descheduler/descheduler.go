@@ -144,7 +144,11 @@ func (d *Descheduler) descheduleOnce() {
 	if err != nil {
 		klog.Errorf("List all ResourceBindings error: %v", err)
 	}
+	klog.InfoS("descheduleOnce", "bindings", len(bindings))
+
 	bindings = core.FilterBindings(bindings)
+	klog.InfoS("descheduleOnce", "filter", len(bindings))
+
 	for _, binding := range bindings {
 		d.deschedulerWorker.Enqueue(binding)
 	}
@@ -156,6 +160,7 @@ func (d *Descheduler) worker(key util.QueueKey) error {
 		return fmt.Errorf("failed to deschedule as invalid key: %v", key)
 	}
 
+	klog.V(4).InfoS("descheduler work", "key", namespacedName)
 	namespace, name, err := cache.SplitMetaNamespaceKey(namespacedName)
 	if err != nil {
 		return fmt.Errorf("invalid resource key: %s", namespacedName)
@@ -171,6 +176,11 @@ func (d *Descheduler) worker(key util.QueueKey) error {
 	}
 
 	h := core.NewSchedulingResultHelper(binding)
+
+	for _, tmp := range h.TargetClusters {
+		klog.InfoS("cluster info", "cluster", tmp.ClusterName, "spec", tmp.Spec, "ready", tmp.Ready)
+	}
+
 	if _, undesiredClusters := h.GetUndesiredClusters(); len(undesiredClusters) == 0 {
 		return nil
 	} else if len(undesiredClusters) == len(binding.Spec.Clusters) {
@@ -190,7 +200,9 @@ func (d *Descheduler) updateScheduleResultV2(h *core.SchedulingResultHelper) err
 
 	message := descheduleSuccessMessage
 	binding := h.ResourceBinding.DeepCopy()
-	undesiredClusterInfos, _ := h.GetUndesiredClustersV2()
+	undesiredClusterInfos, undesiredClusterNames := h.GetUndesiredClustersV2()
+
+	klog.InfoS("undesired cluster info", "clusters", undesiredClusterNames)
 	//undesiredClusterSet := sets.NewString(undesiredClusters...)
 	_, satisfyClusters := h.GetSatisfyClusters()
 	satisfyClusterSet := sets.NewString(satisfyClusters...)
@@ -204,6 +216,7 @@ func (d *Descheduler) updateScheduleResultV2(h *core.SchedulingResultHelper) err
 
 	if len(oldOrderClusters) == 0 {
 		newOrderClusters = satisfyClusters
+		newOrderClusters = append(newOrderClusters, undesiredClusterNames...)
 	} else {
 		newOrderClusters = make([]string, 0)
 		for i, tmp := range oldOrderClusters {
