@@ -3,6 +3,8 @@ package descheduler
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -83,9 +85,13 @@ func NewDescheduler(karmadaClient karmadaclientset.Interface, kubeClient kuberne
 		KeyFunc:       nil,
 		ReconcileFunc: desched.reconcileEstimatorConnection,
 	}
+	schedulerEstimatorWorkerOptions.ReconcileFunc = func(key util.QueueKey) error {
+		return nil
+	}
 	desched.schedulerEstimatorWorker = util.NewAsyncWorker(schedulerEstimatorWorkerOptions)
-	schedulerEstimator := estimatorclient.NewSchedulerEstimator(desched.schedulerEstimatorCache, opts.SchedulerEstimatorTimeout.Duration)
-	estimatorclient.RegisterSchedulerEstimator(schedulerEstimator)
+	//schedulerEstimator := estimatorclient.NewSchedulerEstimator(desched.schedulerEstimatorCache, opts.SchedulerEstimatorTimeout.Duration)
+	//estimatorclient.RegisterSchedulerEstimator(schedulerEstimator)
+
 	deschedulerWorkerOptions := util.Options{
 		Name:          "descheduler",
 		KeyFunc:       util.MetaNamespaceKeyFunc,
@@ -118,8 +124,8 @@ func (d *Descheduler) Run(ctx context.Context) {
 	defer klog.Infof("Shutting down karmada descheduler")
 
 	// Establish all connections first and then begin scheduling.
-	d.establishEstimatorConnections()
-	d.schedulerEstimatorWorker.Run(1, stopCh)
+	//d.establishEstimatorConnections()
+	//d.schedulerEstimatorWorker.Run(1, stopCh)
 
 	d.informerFactory.Start(stopCh)
 
@@ -172,10 +178,90 @@ func (d *Descheduler) worker(key util.QueueKey) error {
 		return nil
 	}
 
-	h.FillUnschedulableReplicas(d.unschedulableThreshold)
-	klog.V(3).Infof("Unschedulable result of resource(%s): %v", namespacedName, h.TargetClusters)
+	//h.FillUnschedulableReplicas(d.unschedulableThreshold)
+	//klog.V(3).Infof("Unschedulable result of resource(%s): %v", namespacedName, h.TargetClusters)
 
-	return d.updateScheduleResult(h)
+	return d.updateScheduleResultV2(h)
+}
+
+var orderKey = "cluster-order"
+
+func (d *Descheduler) updateScheduleResultV2(h *core.SchedulingResultHelper) error {
+
+	message := descheduleSuccessMessage
+	binding := h.ResourceBinding.DeepCopy()
+	undesiredClusterInfos, _ := h.GetUndesiredClustersV2()
+	//undesiredClusterSet := sets.NewString(undesiredClusters...)
+	_, satisfyClusters := h.GetSatisfyClusters()
+	satisfyClusterSet := sets.NewString(satisfyClusters...)
+	var oldOrderClusters []string
+	var newOrderClusters []string
+	if binding.Annotations != nil {
+		if val, ok := binding.Annotations[orderKey]; ok {
+			oldOrderClusters = strings.Split(val, ",")
+		}
+	}
+
+	if len(oldOrderClusters) == 0 {
+		newOrderClusters = satisfyClusters
+	} else {
+		newOrderClusters = make([]string, 0)
+		for i, tmp := range oldOrderClusters {
+			if i == 0 {
+				continue
+			}
+			if satisfyClusterSet.Has(tmp) {
+				newOrderClusters = append(newOrderClusters, tmp)
+			}
+		}
+		// 处理新增的cluster
+		newAdd := satisfyClusterSet.Difference(sets.NewString(oldOrderClusters...))
+		if newAdd != nil && newAdd.Len() > 0 {
+			newOrderClusters = append(newOrderClusters, newAdd.List()...)
+		}
+		// 第0个，放到最后
+		if satisfyClusterSet.Has(oldOrderClusters[0]) {
+			newOrderClusters = append(newOrderClusters, oldOrderClusters[0])
+		}
+	}
+
+	deCount := int32(0)
+	for i, tmp := range binding.Spec.Clusters {
+		if clusterWrap, ok := undesiredClusterInfos[tmp.Name]; ok {
+			binding.Spec.Clusters[i].Replicas = clusterWrap.Ready
+			deCount += clusterWrap.Spec - clusterWrap.Ready
+			message += fmt.Sprintf(", cluster %s from %d to %d", tmp.Name, clusterWrap.Spec, clusterWrap.Ready)
+		}
+	}
+
+	for i, tmp := range binding.Spec.Clusters {
+		if tmp.Name == newOrderClusters[0] {
+			binding.Spec.Clusters[i].Replicas += deCount
+		}
+	}
+
+	if binding.Annotations == nil {
+		binding.Annotations = map[string]string{}
+	}
+	binding.Annotations[orderKey] = strings.Join(newOrderClusters, ",")
+
+	if deCount == 0 {
+		return nil
+	}
+
+	message += fmt.Sprintf(", %d total descheduled replica(s)", deCount)
+
+	var err error
+	defer func() {
+		d.recordDescheduleResultEventForResourceBinding(binding, message, err)
+	}()
+
+	binding, err = d.KarmadaClient.WorkV1alpha2().ResourceBindings(binding.Namespace).Update(context.TODO(), binding, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Descheduler) updateScheduleResult(h *core.SchedulingResultHelper) error {

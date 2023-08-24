@@ -84,7 +84,32 @@ func (h *SchedulingResultHelper) GetUndesiredClusters() ([]*TargetClusterWrapper
 	var clusters []*TargetClusterWrapper
 	var names []string
 	for _, cluster := range h.TargetClusters {
-		if cluster.Ready < cluster.Spec {
+		if cluster.Ready != estimatorclient.UnauthenticReplica && cluster.Ready < cluster.Spec {
+			clusters = append(clusters, cluster)
+			names = append(names, cluster.ClusterName)
+		}
+	}
+	return clusters, names
+}
+
+func (h *SchedulingResultHelper) GetUndesiredClustersV2() (map[string]*TargetClusterWrapper, []string) {
+	var clusters map[string]*TargetClusterWrapper
+	var names []string
+
+	for _, cluster := range h.TargetClusters {
+		if cluster.Ready != estimatorclient.UnauthenticReplica && cluster.Ready < cluster.Spec {
+			clusters[cluster.ClusterName] = cluster
+			names = append(names, cluster.ClusterName)
+		}
+	}
+	return clusters, names
+}
+
+func (h *SchedulingResultHelper) GetSatisfyClusters() ([]*TargetClusterWrapper, []string) {
+	var clusters []*TargetClusterWrapper
+	var names []string
+	for _, cluster := range h.TargetClusters {
+		if cluster.Ready >= cluster.Spec {
 			clusters = append(clusters, cluster)
 			names = append(names, cluster.ClusterName)
 		}
