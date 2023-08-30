@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"flag"
+	"github.com/karmada-io/karmada/pkg/controllers/ud"
 	"net"
 	"strconv"
 	"time"
@@ -196,16 +197,34 @@ func init() {
 	controllers["execution"] = startExecutionController
 	controllers["workStatus"] = startWorkStatusController
 	controllers["namespace"] = startNamespaceController
-	controllers["serviceExport"] = startServiceExportController
-	controllers["endpointSlice"] = startEndpointSliceController
-	controllers["serviceImport"] = startServiceImportController
-	controllers["unifiedAuth"] = startUnifiedAuthController
-	controllers["federatedResourceQuotaSync"] = startFederatedResourceQuotaSyncController
-	controllers["federatedResourceQuotaStatus"] = startFederatedResourceQuotaStatusController
+	//controllers["serviceExport"] = startServiceExportController
+	//controllers["endpointSlice"] = startEndpointSliceController
+	//controllers["serviceImport"] = startServiceImportController
+	//controllers["unifiedAuth"] = startUnifiedAuthController
+	//controllers["federatedResourceQuotaSync"] = startFederatedResourceQuotaSyncController
+	//controllers["federatedResourceQuotaStatus"] = startFederatedResourceQuotaStatusController
 	controllers["gracefulEviction"] = startGracefulEvictionController
 	controllers["applicationFailover"] = startApplicationFailoverController
-	controllers["federatedHorizontalPodAutoscaler"] = startFederatedHorizontalPodAutoscalerController
-	controllers["cronFederatedHorizontalPodAutoscaler"] = startCronFederatedHorizontalPodAutoscalerController
+	//controllers["federatedHorizontalPodAutoscaler"] = startFederatedHorizontalPodAutoscalerController
+	//controllers["cronFederatedHorizontalPodAutoscaler"] = startCronFederatedHorizontalPodAutoscalerController
+	controllers["unitedDeployment"] = startUnitedDeploymentController
+}
+
+func startUnitedDeploymentController(ctx controllerscontext.Context) (enabled bool, err error) {
+	mgr := ctx.Mgr
+	opts := ctx.Opts
+
+	udController := &ud.UnitedDeploymentController{
+		Client:             mgr.GetClient(),
+		EventRecorder:      mgr.GetEventRecorderFor(cluster.ControllerName),
+		RateLimiterOptions: opts.RateLimiterOptions,
+	}
+	if err := udController.SetupWithManager(mgr); err != nil {
+		return false, err
+	}
+
+	klog.InfoS("init UnitedDeployment controller")
+	return true, nil
 }
 
 func startClusterController(ctx controllerscontext.Context) (enabled bool, err error) {
