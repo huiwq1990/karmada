@@ -137,26 +137,81 @@ kind load docker-image "${REGISTRY}/karmada-aggregated-apiserver:${VERSION}" --n
 kind load docker-image "${REGISTRY}/karmada-search:${VERSION}" --name="${HOST_CLUSTER_NAME}"
 kind load docker-image "${REGISTRY}/karmada-metrics-adapter:${VERSION}" --name="${HOST_CLUSTER_NAME}"
 
+docker pull registry.k8s.io/etcd:3.5.9-0
+docker pull docker.io/cfssl/cfssl:latest
+docker pull docker.io/bitnami/kubectl:latest
+docker pull registry.k8s.io/kube-apiserver:v1.25.4
+kind load docker-image docker.io/cfssl/cfssl:latest --name="${HOST_CLUSTER_NAME}"
+kind load docker-image docker.io/bitnami/kubectl:latest --name="${HOST_CLUSTER_NAME}"
+kind load docker-image registry.k8s.io/etcd:3.5.9-0 --name="${HOST_CLUSTER_NAME}"
+kind load docker-image registry.k8s.io/kube-apiserver:v1.25.4 --name="${HOST_CLUSTER_NAME}"
+
+
 #step5. install karmada control plane components
 #"${REPO_ROOT}"/hack/deploy-karmada.sh "${MAIN_KUBECONFIG}" "${HOST_CLUSTER_NAME}"
 export KUBECONFIG="${MAIN_KUBECONFIG}"
 
 
 cat<<EOF > kamada-val-tmp.yaml
+
 # 安装哪些组件
 components: ["descheduler"]
 controllerManager:
   featureGates:
     PropagateDeps: false
     CustomizedClusterResourceModeling: false
+scheduler:
+  image:
+    pullPolicy: IfNotPresent
+webhook:
+  image:
+    pullPolicy: IfNotPresent
+controllerManager:
+  image:
+    pullPolicy: IfNotPresent
+apiServer:
+  hostNetwork: true
+  serviceType: NodePort
+  nodePort: 32592
+  image:
+    pullPolicy: IfNotPresent
+kubeControllerManager:
+  image:
+    pullPolicy: IfNotPresent
+aggregatedApiServer:
+  image:
+    pullPolicy: IfNotPresent
+agent:
+  image:
+    pullPolicy: IfNotPresent
+schedulerEstimator:
+  image:
+    pullPolicy: IfNotPresent
+descheduler:
+  image:
+    pullPolicy: IfNotPresent
+search:
+  image:
+    pullPolicy: IfNotPresent
 EOF
 
 helm install karmada -n karmada-system -f kamada-val-tmp.yaml --create-namespace --dependency-update ./charts/karmada
 
+rm -rf kamada-val-tmp.yaml
+
+
+kubectl get secret -n karmada-system   karmada-cert -o json | jq '.data."karmada.key"' -r | base64 -d > /tmp/karmada.key
+kubectl get secret -n karmada-system   karmada-cert -o json | jq '.data."karmada.crt"' -r | base64 -d > /tmp/karmada.crt
+
+CERT_DIR=/tmp
+#karmada-apiserver.karmada-system.svc.cluster.local
+KARMADA_APISERVER_IP=10.253.55.196
+KARMADA_APISERVER_SECURE_PORT=32592
+util::append_client_kubeconfig "${MAIN_KUBECONFIG}" "${CERT_DIR}/karmada.crt" "${CERT_DIR}/karmada.key" "${KARMADA_APISERVER_IP}" "${KARMADA_APISERVER_SECURE_PORT}" karmada-apiserver
 
 #step6. wait until the member cluster ready and join member clusters
-#util::check_clusters_ready "${MEMBER_CLUSTER_1_TMP_CONFIG}" "${MEMBER_CLUSTER_1_NAME}"
-#util::check_clusters_ready "${MEMBER_CLUSTER_2_TMP_CONFIG}" "${MEMBER_CLUSTER_2_NAME}"
+util::check_clusters_ready "${MEMBER_CLUSTER_1_TMP_CONFIG}" "${MEMBER_CLUSTER_1_NAME}"
+util::check_clusters_ready "${MEMBER_CLUSTER_2_TMP_CONFIG}" "${MEMBER_CLUSTER_2_NAME}"
 
 # connecting networks between karmada-host, member1 and member2 clusters
 echo "connecting cluster networks..."

@@ -9,3 +9,7 @@ nodes:
         hostPort: 5443
         protocol: TCP
         listenAddress: "{{host_ipaddress}}"
+      - containerPort: 32592
+        hostPort: 32592
+        protocol: TCP
+        listenAddress: "{{host_ipaddress}}"
