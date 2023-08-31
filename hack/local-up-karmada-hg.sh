@@ -158,7 +158,7 @@ cat<<EOF > kamada-val-tmp.yaml
 components: ["descheduler"]
 controllerManager:
   featureGates:
-    PropagateDeps: false
+    PropagateDeps: true
     CustomizedClusterResourceModeling: false
 scheduler:
   image:

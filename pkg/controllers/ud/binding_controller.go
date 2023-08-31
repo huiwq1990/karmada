@@ -133,6 +133,7 @@ func genTemplate(deploy *v1.Deployment, clusterNames sets.String) *policyv1alpha
 			Name:      deploy.Name,
 		},
 		Spec: policyv1alpha1.PropagationSpec{
+			PropagateDeps: true,
 			ResourceSelectors: []policyv1alpha1.ResourceSelector{
 				policyv1alpha1.ResourceSelector{
 					APIVersion: deploy.APIVersion,
