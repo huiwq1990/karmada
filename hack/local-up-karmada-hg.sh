@@ -160,15 +160,15 @@ controllerManager:
   featureGates:
     PropagateDeps: true
     CustomizedClusterResourceModeling: false
+  image:
+    pullPolicy: IfNotPresent
 scheduler:
   image:
     pullPolicy: IfNotPresent
 webhook:
   image:
     pullPolicy: IfNotPresent
-controllerManager:
-  image:
-    pullPolicy: IfNotPresent
+
 apiServer:
   hostNetwork: true
   serviceType: NodePort
@@ -195,7 +195,7 @@ search:
     pullPolicy: IfNotPresent
 EOF
 
-helm install karmada -n karmada-system -f kamada-val-tmp.yaml --create-namespace --dependency-update ./charts/karmada
+helm upgrade --install karmada -n karmada-system -f kamada-val-tmp.yaml --create-namespace --dependency-update ./charts/karmada
 
 rm -rf kamada-val-tmp.yaml
 
