@@ -122,11 +122,9 @@ test: install_gotest
 	$(GOTEST) --race --v ./cmd/... -coverprofile=./_output/coverage/coverage_cmd.txt -covermode=atomic
 	$(GOTEST) --race --v ./examples/... -coverprofile=./_output/coverage/coverage_examples.txt -covermode=atomic
 
-upload-images: images
+upload-images:
 	@echo "push images to $(REGISTRY)"
-ifneq ($(REGISTRY_USER_NAME), "")
-	docker login -u ${REGISTRY_USER_NAME} -p ${REGISTRY_PASSWORD} ${REGISTRY_SERVER_ADDRESS}
-endif
+
 	docker push ${REGISTRY}/karmada-controller-manager:${VERSION}
 	docker push ${REGISTRY}/karmada-scheduler:${VERSION}
 	docker push ${REGISTRY}/karmada-descheduler:${VERSION}
