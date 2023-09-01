@@ -107,6 +107,10 @@ spec:
             type: DirectoryOrCreate
           name: etcd-data
         {{- end }}
+        {{- if eq .Values.etcd.internal.storageType "emptyDir" }}
+        - emptyDir: {}
+          name: etcd-data
+        {{- end }}
   {{- if eq .Values.etcd.internal.storageType "pvc" }}
   volumeClaimTemplates:
     - metadata:
