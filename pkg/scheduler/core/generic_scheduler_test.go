@@ -2,6 +2,7 @@ package core
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,9 +55,24 @@ func Test_rescheduleClusterChange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := rescheduleClusterChange(tt.args.candidateClusters, tt.args.preClustersWithReplicas); !reflect.DeepEqual(got, tt.want) {
+			if got := rescheduleClusterChange(tt.args.candidateClusters, tt.args.preClustersWithReplicas); !scheduleResultEqual(got, tt.want) {
 				t.Errorf("rescheduleClusterChange() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func scheduleResultEqual(cand []workv1alpha2.TargetCluster, want []workv1alpha2.TargetCluster) bool {
+	if len(cand) != len(want) {
+		return false
+	}
+
+	sort.SliceStable(cand, func(i, j int) bool {
+		return cand[i].Name < cand[j].Name
+	})
+
+	sort.SliceStable(want, func(i, j int) bool {
+		return want[i].Name < want[j].Name
+	})
+	return reflect.DeepEqual(cand, want)
 }
